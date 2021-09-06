@@ -1,0 +1,332 @@
+Learning with noisy label (weak supervised)
+
+1. (2021) (7000 *) A Realistic Simulation Framework for Learning with Label Noise 
+2. (2021) (2000 stars) Confident Learning: Estimating Uncertainty in Dataset Labels
+	python package: cleanlab
+3. (2018) (2000 stars) https://paperswithcode.com/paper/co-teaching-robust-training-of-deep-neural
+4. (2021) (650 stars) Sharpness-Aware Minimization for Efficiently Improving Generalization
+
+Related Work
+	2020 MentorMix
+	2020 MCSoftMax
+	2020 Meta Learning
+	2020 Noisy Student
+	2019 INCV
+	2018 Mixup
+	2018 MentorNet
+	2018 Co-teaching
+Others
+
+
+
+Learning with noisy label
+1. (2021) (7000 *) A Realistic Simulation Framework for Learning with Label Noise 
+	summary: use a bunch of models, called rater, trained on cleaned dataset to generate synthesis label from noised datasets => synthetic datasets，更像真實產生的
+		用這樣的 dataset 去測試真實的 noise label 可能有的 impact 以及現存的 noisy labels algorithm 在這樣 dataset 上的表現
+		還產生了 LQM: 可以用 rater models 的一些 features 來協助從 noisy labels 預測出 clean labels，但是架構沒有說清楚
+			還可以用 rater models 的 aggregation (agreement) 來預測 clean labels
+
+
+	LQM label quality model leverages annotator features
+	adding LQM as a label correction step before applying existing noisy label techniques
+
+	如何製作可控的 noisy label dataset matters: 
+		以前有的數據集的 label noisy 的 type / level 不可控
+		有的用隨機翻轉來模擬 => 但人類造成的 label noise 通常不是這樣，而是 instance-dependent => harder and nuanced examples such as blurred images are easier to get wrong label
+		使用額外的標註者的 feature
+	
+	main contribution
+		1) propose a pseudo-labeling simulation framework for learning with realistic label noise. detailed description, including the generation of rater features
+		2) find that noisy labels are more detrimental 1) under class imbalanced settings 2) when pretraining is not used 3) on tasks that are easier to learn with clean labels (?)
+		3) with the same fraction of mislabeled data, our synthsis dataset tend to be harder than datasets with random label flipping for binary classification. But for multi-class tasks, we observe oppsite trend
+		4) We propose a label correction approach, named Label Quality Model (LQM), that leverages rater features to significantly improve model performance. And can further combined with existing noisy label techniques to further improve the performance
+	
+	three approach for generating noisy labels (y* means clean label of the example, x means the input feature and r means the rater feature space)
+		1) Independent random flipping: with probability a, the label of each example is flipped to an incorrect one, uniformly chosen from all the other K − 1 labels 
+			=> p(y=k|y*) = (1-a)*(k=y*) + a/(K-1)*(k!=y*)
+		2) class conditional random flipping (asymmetric label noise): there is a stochastic matrix T belongs to R^{KxK}, the i-th row of T corresponds to the probability distribution of the noisy label y given that the clean label y* = i 
+			=> p(y=j|y*=i) = T_{i, j}
+			usually considered more realistic than symmetric noise since classes that are semantically close are more likely to be confused than classes that have clearer decision boundaries. The matrix is designed with human knowledge or estimated from a small subset of clean data, do not depend on the input feature and the rater r
+		3) instance dependent: this paper, generating noisy labels according to
+			=> p(y|x, y*, r)
+
+	特徵 of rater synthesis dataset:
+		1) The distribution of rater errors should be qualitatively similar to real human labels => right skewed
+		2) label noise should be class conditional 見 Figure3
+
+		1) 使用各種 architectures 來訓練出一個 rater pool ，裡面有各式各樣的 model （稱為 rater）然後用這些 model 模擬人類給 noisy label dataset 預測出 label ，因為有 multiple models => multiple noisy labels
+			為了讓 rater 預測出來的 noisy label 更像人為的 => 在機率分布上相似 => right skewed distribution => 大部分的 data 只有 small rater error rate, 少少的 hard examples 會有 large rater error rate, similar trend should be observed for the entropy (measuring consistency)
+			但是不是在每一個 single data point 都很像人為的 noisy label
+		
+			如果是使用 random flip => 因為有固定的 flip probability => 所以錯誤 label 一定佔固定的比值，而 distribution 會以該比值為中心呈現類似常態分佈，就不是 right skewed，見 Figure 2
+			白話: 當用 rater model 來模擬人類上標籤的情況，right skew 代表大部分的 rater model 其會預測出錯誤 label 的機率 rater error rate 都很低，少部分會高一點點，但總之不會固定在某個值附近
+		2) 見 Figure 3, rater models 在預測時，當 clean label 為 A 時，models 大部分也會預測為 A (90%), 但 model 可能會有 2~10% 誤認為 class B or ... 代表 models 會誤認 class A B => 當 clean label 為 B 時，model 有同樣機率會搞混為 A  
+
+	different views for the impact of noisy labels to dl models
+		1) most of the recent research try to design algorithms that can tackle negative impact of label noise 
+		2) some paper say dl models are robust to independent random label noise
+		3) some say large model can easily fit all noisy labels in the training data (全部死記), 這時 small model 比較好 => 比較不會完全 fit 完全死記 => more robust due to regularization effect 
+		
+	the finding of realistic impact in this paper
+		1) label noise has higher impact on more imbalanced datasets
+			因為 minority classes 已經很少數據如果還有 label noise => bad
+			各種設定的 error rate 都隨著 imbalanced 的程度上升
+
+		2) pretraining improved robustness to label noise
+			在不同的 error rate 設定中，pretaining 的整體準確率表現都高許多
+			pretrained model 已經被觀察到 improve robustness to independent random label noise and the web label noise
+			因為 model pretraining adds strong inductive bias to the model and thus they are less sensitive to a fraction of noisy labels during fine-tuning
+
+			besides 我們還觀察到 ImageNet pretraining does not improve the test accuracy under noisy labels for the PatchCamelyon dataset，可能是因為後者是 medical image 與 imagenet 得 domain 差太多 => 這時就算有 pretrain 也沒有作用
+
+		3) eaiser tasks are more sensitive to label noise
+			在這裡如何區別 easier? 當 models 在 test accuracy 都比較高的 task 就是 easier
+			our hypothesis is when a task is already hard to learn even given clean labels, then the impact of label noise is small
+			when a classification task is hard, the data distributions of different classes are relatively close such that some data are mislabeled, the final performance may not be heavily impacted
+			On the contrary, label noise in easier tasks can change the wll-seperated data point more significantly
+
+	Benchmarking existing noise label algorithms 
+		5 algorithms on rater synthesis dataset and random flip dataset that has the same rater error rate
+		1) vanilla training with cross entropy loss (baseline)
+		2) bootstrap (2014)
+		3) co-teaching (2018)
+		4) cross entropy loss with Monte Carlo sampling (MCSoftMax, 2020)
+		5) MentorMix (2020)
+
+		Results: number of classes matters:
+			for tasks with a large number of classes such as CIFAR100, most algos achieve better test accuracy on synthesis dataset compared to random label noise
+			for binary classification problems, most algos perform worse on our dataseys
+			On CIFAR10, we observed mixed behavior, depending on the amound of noise and the algorithm
+
+		Explanation:
+			for binary problems, the mislabeled data in our synthetic datasets are usually ambiguous ones (如果不是模糊地帶的data rater models 才不會分錯) that located around the decision boundary => hurt the model's performance 因為讓 model 在 ambiguous 的 hard example 學習到錯誤的
+			for tasks with a large number of classes, 因為 rater models 會分錯代表那兩個類別很像，例如可能把哺乳類A 分成另一種哺乳類 => only happens to similar fine-grained classes, 不會發生在 high-level super classes 所以傷害沒那麼大，起碼大方向是對的 (兩種哺乳類會聚集在附近，起碼是辨認出哺乳類了) 
+		
+		this paper demonstrate the importance of using more realistic synthetic benchmarks，因為用 random label noise 可能沒辦法顯示在現實情況下的模樣
+
+	LQM Label Quality Model
+		is an intermediate supervised tasks aimed at predicting the clean labels from noisy labels by leveraging rater features and a paired subset for supervision	
+		we expect that in real world scenarios some level of label noise may be unavoidable. (hard example, multi class in one picture but should only have one label, just having part of the class object in the picture)
+		
+		Algorithm Design
+			(我們有 unlabeled dataset, 使用 clean label dataset 去訓練出 rater models 再用 rater models 在 unlabeled input xi 上預測出 noisy label yi, 並同時加入 rater training metadata eg. accuracy, loss, number of epochs, rater ids, type of architecture 產生了 D)
+				D := {(xi, yi, ri)}^N_{i=1} noisy label dataset, yi is the one-hot encoded noisy label, ri is the rater feature coreesponding to yi
+			(讓 rater models 在部分的 clean label dataset 上預測 noisy label 或是將部分的 noisy label dataset 手動檢查出 clean label 而獲得了 Dps, 應該是前者)
+				Dps = {(xi, yj, rj, yj*)}^M_{j=1} is the paired-subset, yj* is a more accurate label than yj
+			(Dps 的量不用很大)
+				M << N eg. M = 1/10N
+			(這個 LQM 就是一個 1 hidden layer with nueron 8, 16, 32 的 MLP)
+				optimize a parameterized model LQM(\theta; x, r, y) to approximate the conditional probabilty p(y*|x, r, y) using Dps
+			(LQM 的訓練不會直接建立在 raw input xi 上，而是會使用一個輔助的分類器 auxiliary classifier eg. MobileNet-v2，這個分類器可能利用 D or Dps 來訓練，看哪個好用哪個，然後再用分類器的 output logits 來 train LQM?????????)
+				Instead of training LQM with raw input x, we first train an auxiliary image classifier and train LQM using the output logits of f(x)
+				given that LQM has fewer training examples, using an auxiliary image classifer significantly simplifies training
+				兩種猜測
+					1) 先用 xi -> auxiliary classifier -> prediction <-> yi 訓練好輔助分類器再 xi -> auxiliary classifier -> LQM <-> yi
+					2) 用 xi -> auxiliary classifier -> output logits -> LQM <-> yi 如果是這種那明明輔助分類器與 LQM 的 training dataset number 都一樣為什麼還說 has fewer training examples
+
+			(主要會利用 LQM 的 output on xi + xi 來訓練一個大的 model: main prediction model eg. ResNet50)
+				Instead of trying to predict P(yi|xi) => we train a Model to predict P(LQM(\theta; xi, ri, yi)|xi)
+			(拿來訓練大 Model 的 LQM 的 output 會做線性的平均)
+				To produce stronger results, we recommend training with target yi~ = \gamma*LQM(\theta;xi,ri,yi) + (1-\gamma)*yi where \gamma is a hyperparameter between 0 ~ 1 and can be selected using validation set
+					It's particularly helpful for datasets with a large number of classes such as CIFAR100, since it prevents the training target from getting too far from the original noisy labels yi 
+					Moreover, since yi~ specifies a distribution over the labels, we can also sample a single one-hot label according to the distribution yi~ as the target
+				
+2. (2021) (2000 stars) Confident Learning: Estimating Uncertainty in Dataset Labels
+	cleanlab python package
+	藉由計算 noisy label 和 predict label 的 joint distribution 來找出可能有問題的
+
+	先前的 noisy label weak supervised 問題都是引進新的 model or loss function 
+	但是如何找到 error label example, 如何 learn well despite noisy label
+	data-centric approach
+	1) 1988 Angluin and Laird's provide a basic assumption: label noise is class-conditional: 就算標錯，但獵豹更容易被標成美洲豹而不是浴缸
+		every label in class j belongs to [m] may be mislabeled as class i belongs to [m] with probability p(y~=i|y*=j)
+	2) direct estimation of the joint distribution between noisy (given) labels and true (unknown) labels can be pursued effectively based on three approach
+		1. Prune, to search for label errors, using soft-pruning via loss-reweighting, to avoid convergence pitfalls of iterative relabeling
+		2. Count, to train on clean data, avoiding error-propagation in learned model weights from reweighting the loss with imperfect predicted probabilities
+		3. Rank which examples to use during training, to allow learning with unnormalized probabilities or decision boundary distances, building on well-known robustness findings and ideas of curriculum learning
+
+	Contribution
+		1. CL exactly finds label errors and exactly estimates the joint distribution of noisy and true labels
+		2. CL algorithm is empirically performant on three tasks (a) label noise estimation, (b) label error funding, and (c) learning with noisy labels
+
+
+
+Others:
+
+1. (2021) Manual Evaluation Matters: Reviewing Test Protocols of Distantly Supervised Relation Extraction
+	總結：建立一套測試的方法與測試集來衡量 DSRE 的準確度，通常用於 NLP 的 auto-label
+	Distantly Supervised relation extraction can utilize large-scale auto-labeled data.
+
+2. (2020) Probabilistic Regression for Visual Tracking
+	機率、數學很重
+	普通 model 在衡量機率時都是使用 confidence score，但其實缺乏明確的機率含義
+	總結：提出一個 probabilistic regression formula which predicts the conditional probabiliy density of target state
+
+	有些 vision tasks 是 direct regression => optical flow / depth estimation
+	有些則是 predict a confidence score => visual tracking / object detection / human pose estimation
+		然後 maximized confidence score to achieve the final estimate
+	
+	unlike the aforementioned confidence-based models, 
+	our approach generates a predictive probability distribution p(y|xi, θ) as output
+
+	The network is trained by minimizing the KL divergence 
+		between the predictive density p(y|x, θ) and the conditional ground-truth distribution p(y|yi)
+		可以對 label noise and ambiguities 建模
+
+	During inference, a point estimate of the regressed value is obtained by maximizing the predicted density.
+
+3. (2020) Neural Clustering Processes
+	機率很重
+	Probabilistic clustering models
+	總結：we introduce deep network architectures trained with labeled samples from any generative model of clustered datasets
+	our methods sample the labels of all the data points from a well-defined posterior, and can learn nonparametric Bayesian posteriors since they do not limit the number of mixture components
+
+4. (2019) Self-Correction for Human Parsing
+	
+	總結：introduces a purification strategy, design a cyclical learning scheduler to infer more reliable pseudo masks
+			by iteratively aggregating the current learned model with former optimal one in an online manner.
+			循環的訓練方法：將過去最佳的模型與現在訓練的 model 進行 average 整合，包含 weight 和 (pseudo) label
+			=> model and labels will reciprocally become more robust and accurate
+	
+	labeling pixel-level masks for fine-grained semantic segmentation tasks eg. human parsing 很難因為邊界是模糊、很難定義
+	=> gt label 通常都有 noise
+
+	the whole SCHP pipeline can be divided into two sub-procedures, i.e. the model aggregation and the label refinement proced
+	By an online manner (每個 training cycle), we average both model weights and the predictions simultaneously
+
+	流程：
+		model 的初始表現很重要，如果初始訓練的 model 不夠準 => iterate 的過程中可能是有害的
+		1. a good initialization: when the training loss starts to flatten with the original noisy labels
+		2. 接下來每個 model cycle 都採取 cosine annealing learning rate scheduler 來 warm up 
+		3. 要從過去最佳的 model 獲得 potential information 來 improve future model
+			這些 model will converge to a local-minimum at the end of each cycle
+			=> aggregate current model weight w^ with the former sub-optimal one w^_m-1 to achieve a new model weight w^_m
+
+			w^_m = m/(m+1)*w^_m-1 + 1/(m+1)*w^
+
+			where m denotes the current cycle number and 0 ≤ m ≤M.
+		4. 更新完 weight 後 => forward training data 一次來重新獲得一些統計數值 eg. moving average and std of BN
+			=> during this successive cycles of model aggregation, the network leads to wider model optima as well as better generalization ability
+
+		5. update the gt training labels (soft, multi-class labels which contain dark information)
+			=> becoming more unambiguous, smmoth and having the relational information between the fine-grain categories
+			this improves the network performance as well as the generalization ability of the model
+			Also, these pseudo masks potentially alleviate or eliminate the noise in the original gt.
+
+			y^_m = m/(m+1)*y^_m-1 + 1/(m+1)*y^
+
+	Transuction vs Induction: semi-supervised vs fully supervised 
+		在這裡主要是 supervised, 但 semi supervised 如果資料質量夠高也可以
+
+5. (2020) Inaccurate labels in weakly-supervised deep learning: Automatic identification and correction and their impact on classification performance
+	automated methodological framework to identify mislabeled data using two metric functions
+	1. Cross-entropy Loss that indicates divergence between a prediction and label
+	2. Influence function that reflects the dependence of a model on data. (就是在原 model 拉一條 path 出來計算一個 score)
+	image -> model -> loss / influence score (跟 loss 的產出很像)
+	then correct the identified label
+
+6. (2019) NLNL: Negative Learning for Noisy Labels
+	普通訓練都是使用 positive learning (PL): tell the model that input images belong to this label
+	但是如果是 mislabeled data => wrong information
+
+	總結：提出一個反向的方法避免 overfit on noisy data，
+		  告訴 model that the input dose not belong to this complementary label. Because the chances of selecting a true label as a complementary label are low, NL decreases the risk of providing incorrect information
+		  Utilizing the proposed NL, we introduce a new framework, called SelNLPL, for filtering out noisy data from training data.
+
+	1. How to generate complementary label
+		Input: Training label y ∈ Y
+			while iteration do
+				y = Randomly select from {1, ..., C} \ {y}
+		Output: Complementary label y
+	
+	2. How to compute negative label loss
+		選出 label 以後將 label 值設為零 =>  it optimizes the output probability corresponding to the complementary label to be far from 1 (to reach 0 in the end)
+
+	3. SelNL selective NL
+		After training with NL, SelNL trains the CNN only with the data having confidence over 1/c.(c 是 class number) 
+		After thresholding, the data involved in training tends to be less noisy than before, thus improving the convergence of the CNN efficiently
+
+	4. SelPL selective PL
+		NL can be a better learning method when noisy data is involved，但如果 data 已經 clean 的則直接使用 PL 會快且準許多
+		現在 After NL and SelNL, the confidences of clean and noisy data are separated by a large margin
+			=> SelPL trains CNN only with data having confidence over γ, assuming that such data is clean data. In this study, we set γ to 0.5.
+
+	SelNLPL algorithm
+		Input: Training data (x, y) ∈ (X , Y), network f(x; θ),
+		total epoch T
+		NL phase:
+			for i ← 1 to T do
+				Batch ← Sample x (negative label)
+				Update f by minimizing loss
+		SelNL Phase:
+			for i ← 1 to T do
+				Batch ← Sample x if p_y > 1/c
+				Update f by minimizing Loss
+		SelPL
+			for i ← 1 to T do 
+				Batch ← Sample x if p_y > \gamma
+				Update f by minimizing Loss
+		Output: Network f(x; θ)
+
+	Use SelNLPL for semi-supervised noisy label training
+		1.  the training data is divided into clean data and noisy data by using the CNN that is trained with SelNLPL
+		2. the initialized CNN (our desired model) is trained with clean data obtained from SelNLPL
+		3. Then, the noisy data’s label is updated with the output of the CNN
+			here we use soft label as the updated label because soft labels are better when updating labels
+		4. Finally, clean data and label-updated noisy data are used to train the initialized CNN
+
+
+7. (2020) SER-FIQ: Unsupervised Estimation of Face Image Quality Based on Stochastic Embedding Robustness
+	Avoiding the use of inaccurate quality labels, we proposed a novel concept to measure face quality based on an arbitrary face recognition model.
+	By determining the embedding variations generated from random subnetworks of a face model, the robustness of a sample representation and thus, its quality is estimated.
+
+	總結：可以估計 image 的 quality
+		利用 subnetwork 的 agreement
+		使用一個現有的成熟模型(在這個任務是 face recognition model) 的 random sub-networks
+		如果這些子模型產生的 stochastic embedding variant 很高 => 代表這是low robustness 低質量圖片
+		如果這些子模型							 			低 => 代表這是 high robustness 高質量圖片
+
+		可以完全避免再 training ，直接用現有成果估計
+
+8. (2018) Clearing noisy annotations for computed tomography imaging
+	Domain: computed tomography (CT) imaging segmentation
+	總結：propose a clearing algorithm for annotations
+	It consists of 3 stages:
+	• annotators scoring, which assigns a higher confidence level to better annotators;
+	• nodules scoring, which assigns a higher confidence level to nodules confirmed by good annotators;
+	• nodules merging, which aggregates annotations according to nodules confidence.
+
+	the algorithm can be applied to many different tasks where there are several annotators labeling each image.
+
+	annotators 的問題： different annotators can annotate the same image in different ways and very often their decisions are not similar and sometimes even mutually exclusive
+
+	適用於我們有每張 image 的 annotators 的資料 => 才可以互相比較正確性，或是誰跟其他人不一樣才能下 score
+
+
+9. (2018) Joint Optimization Framework for Learning with Noisy Labels
+	跟 4. 很像，在訓練過程更新 gt label 和 weight
+
+10. (2019) Learning to Learn from Noisy Labeled Data
+	大部分 dataset 通常都含有 inaccurate labels => training on these noisy labels 會降低模型表現因為模型通常會 overfit （直接記住）on these noisy labels
+	總結：propose a noise-tolerant training algorithm, where a meta-learning update is performed prior to convetional gradient update
+			藉由產生合成的 noisy label => 訓練 model 所以這時產生的 gradient update 不會對原本特定的 noisy label overfit
+
+	流程：1. 合成 labels: 在每個 k-sized mini batch 中，我們隨機選擇 p samples (p<k)，
+							對於每個 sample x_i in p， 我們用找出 top-10 nearest neighbors of x_i within the mini-batch， (10 是實驗出來的結果)
+							然後用 10 個裡面隨機的一個取其 label 來取代 x_i 的 label y_i
+							這樣子取代的 label 因為是同一個 mini batch，所以合成的 label 跟原始的 noisy label 是同一個分佈
+
+							PS. 如何計算 nearest neighbors: based on the Euclidean distance between feature representations
+											(pre-softmax layer activations) generated by a DNN pretrained on the entire noisy training set D
+
+		  2. 用這些合成的 label 算出來的 loss / gradient 去更新出 θ'
+
+			θ 是本輪 current model 的參數 => θ' = θ - 合成的 gradient update	
+
+		  3. 引入 teacher model，其參數 θ~ = \gamma * θ~ + (1-\gamma) * θ 	(使用本輪還沒合成更新過的模型參數)
+		  		讓模型不要 overfit on specific noisy labels
+				=> 讓合成labels更新過後的 2. 模型與 teacher model 可以有 consistent prediction
+				=> 讓更新過後的 2. 的模型 prediction  與 teacher model 的 prediction 的 KL-divergence loss 最小
+				=> 然後將此次的 gradient update 更新回 θ 
+
+		  4. 使用 θ 作為 current model 開啟下一輪 
