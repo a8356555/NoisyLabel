@@ -3,7 +3,7 @@ Experimenting on
 https://colab.research.google.com/drive/1yNLT6kJxTY5LNwaVebQGtFv1MElg8jaf#scrollTo=n49IjYULos6a
 
 # Table of Contents
-2. [Noisy Label Skills & Papers](#nls)
+* [Noisy Label Skills & Papers](#nls)
     1. [Dataset info](#di)
     2. [Target](#ta)
     3. [Papers](#p)
