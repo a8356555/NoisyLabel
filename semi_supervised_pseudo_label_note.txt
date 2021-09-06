@@ -1,0 +1,123 @@
+"""
+0. 泛化模型概念比較
+	semi-supervised learning
+		一部份數據缺少 label，但仍利用這些數據來 generalized 訓練
+
+	self-supervised learning
+		透過操作現有的 data 使用特製的任務來先訓練模型獲得 generalized information
+		eg. 把 input data 挖空、變色
+		
+		meta-learning
+
+	self-training
+	a kind of 半監督
+1. 偽標籤 
+PS. Teacher Student 架構
+2. Noisy Student
+"""
+
+1. pseudo labeling (也是一種 teacher student)
+	半監督模型 => 有很多 data lack of label
+	
+	概略過程
+		有標籤的 data => train first model
+		first model pred on 沒標籤 data => pseudo label
+		利用信任的 pseudo label 來再次訓練 model
+
+		如果沒有好的設計並不會收斂、提升性能、正確預測
+
+1-1. 入門版
+	1. 使用标记数据训练有监督模型M
+	2. 使用有监督模型M对无标签数据进行预测，得出预测概率P
+	3. 通过预测概率P筛选高置信度样本 
+	4. 使用有标记数据以及伪标签数据训练新模型M’
+
+1-2. 進階版 （師徒）
+	1-4. 一樣
+	5. 将M替换为M'，重复以上步骤(M' 再去預測概率再找到 trust part 再訓練 M' 再使用 M ...)
+	直至模型效果不出现提升
+
+1-3. 創新版 （Loss 給 unlabeled data 一個權重）
+	1. 使用标记数据训练有监督模型
+	2. 使用有监督模型M对无标签数据进行预测，得出预测概率P
+	3. 将模型损失函数改为Loss = loss(labeled_data) + alpha*loss(unlabeled_data)
+	4. 使用有标记数据以及伪标签数据训练新模型M’
+
+原理
+	根据聚类假设（cluster assumption），这些概率较高的点，通常在相同类别的可能性较大，所以其pseudo-label是可信度非常高的。（合理性）
+	熵正则化是在最大后验估计框架内从未标记数据中获取信息的一种方法，通过最小化未标记数据的类概率的条件熵，促进了类之间的低密度分离，
+		而无需对密度进行任何建模，通过熵正则化与伪标签具有相同的作用效果，都是希望利用未标签数据的分布的重叠程度的信息。（有效性）
+
+PS. Teacher Student 模型
+	用 labeled data 訓練 Teacher Model 
+	Teacher Model 在 unlabeled data 預測出 pseudo label
+	用 (pseudo label + unlabeled data) + labeled data 訓練 Student Model
+
+	舊的 TS 架構：是用來壓縮模型、蒸餾用的 Hinton
+		首先使用训练数据集，通过构建比较复杂的网络结构来学习到一个teacher network，
+		然后使用这个学习到的teacher network重新对训练数据集进行预测，生成 softmax 的结果概率分布 qi = exp(zi/T) / sum(exp(zj/T)) where T=1, 2, ... 蒸餾係數
+		再用 qi 訓練較小的 Student 模型
+
+2. Noisy Student
+	Teacher student model 的一種
+	student model在训练过程中应加噪声，如dropout, stochastic depth andaugmentation等。
+	而teacher model在产生伪标签时不应加噪声。因为Noisy 是整个算法的一个重要部分，所以他们称之为“Noisy Student”
+
+	Noist Student 与经典的自学习算法相似，但主要区别在于
+		1. 使用不同的方法给学生增加噪音。
+			需要注意的是，当生成伪标签时，教师并没有被噪声干扰
+		2. 尽管教师和学生的结构可以相同，但学生模型的容量应该更高。
+			为什么？因为它必须适合一个更大的数据集（标签和伪标签）。因此，学生模型必须大于教师模型。
+		3. 平衡数据：作者发现，当每个类的未标记图像数量相同时，学生模型效果良好
+
+	Iterative Training
+	（1）首先，EfficientNet-B7作为教师模型和学生模型来提高其准确性。
+	（2）优化后EfficientNet-B7现在被用作教师，EfficientNet-L0被用作学生模型。
+	（3）再使用EfficientNet-L0作为教师，而EfficientNet-L1作为学生模型，它比L0更宽。
+	（4）然后，EfficientNet-L1被用作教师，EfficientNet-L2作为最大的模型被用作学生。
+	（5）EfficientNet-L2是最终的model。
+  
+  
+常用方法
+	1. 入門版 (單訓練)
+		1. 使用标记数据训练有监督模型M
+		2. 使用有监督模型M对无标签数据进行预测，得出预测概率P
+		3. 通过预测概率P筛选高置信度样本
+		4. 使用有标记数据以及伪标签数据训练新模型M’
+
+	2. 進階版 (交互訓練)
+		1. 使用标记数据训练有监督模型M
+		2. 使用有监督模型M对无标签数据进行预测，得出预测概率P
+		3. 通过预测概率P筛选高置信度样本
+		4. 使用有标记数据以及伪标签数据训练新模型M’
+		5. 将M替换为M’，重复以上步骤直至模型效果不出现提升
+
+	3. 創新版
+		1. 使用标记数据训练有监督模型M
+		2. 使用有监督模型M对无标签数据进行预测，得出预测概率P
+		3. 将模型损失函数改为Loss = loss(labeled_data) + alpha*loss(unlabeled_data)
+		4. 使用有标记数据以及伪标签数据训练新模型M’
+
+有效原因
+	利用置信度高的样本来提升模型的拟合能力。在聚类假设及熵正则化的角度上，这是符合我们的感受的，这也使得使用这项技术变得自然而然
+	
+	pseudo label 可以套用的兩個假設：
+		1. cluster assumption 聚類假設: 合理性，置信度（概率）較高的點，通常在相同類別的可能性比較大
+										通常每個類別之樣本在表示空間中應該要緊密聚在一起（高密度區域）
+										而不同類別則會彼此有距離、分離清楚
+										所以決策邊界 (decision boundary) 會落在低密度區域 => 增加泛化能力
+										
+										意思是每個類別的特徵易於分辨，經模型投射到空間中可以清楚分離 => 很好做決策、很好泛化
+										反面的說就是如果類跟類的特徵差別很難判別 => 各類別樣本經模型投射空間中大部分重疊、決策邊界位於高密度區域而非低密度區域 => 就會很難分類並不利於泛化
+
+										應用於 unlabeled data: 若圖片內容正常且符合聚類假設，即樣本易於分類，則經模型投射到樣本空間後，應該會位於某一高密度區域(代表某個類別)
+										Because neighbors of a data sample have similar activations with the sample by embedding based penalty term, 
+											it’s more likely that data samples in a high-density region have the same label.
+
+										所以如果高置信度高概率的樣本卻不在同一個類別就會失效（可能模型在 labeled data 的訓練就不好）
+
+		2. 熵正則化: 在最大后验估计框架内从未标记数据中获取信息的一种方法，
+					 通过最小化未标记数据的类概率的条件熵，促进了类之间的低密度分离，而无需对密度进行任何建模，通过熵正则化与伪标签具有相同的作用效果，
+					 都是希望利用未标签数据的分布的重叠程度的信息。
+
+					 所以如果样本空间覆盖密集就會失效
