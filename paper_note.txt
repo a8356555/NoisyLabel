@@ -330,3 +330,56 @@ Others:
 				=> 然後將此次的 gradient update 更新回 θ 
 
 		  4. 使用 θ 作為 current model 開啟下一輪 
+
+
+
+
+
+
+
+
+
+# Noisy Student
+1. semi-supervised and self-training
+2. equal or larger student models
+	key improvement different from knowledge distillation
+	因為要適應更大的數據及（labeled + unlabeled data）
+3. add noise to the student during learning
+	key improvement different from knowledge distillation
+
+	input noise
+		data augmentation: RandAugment
+	model noise
+		dropout 
+		stochastic depth for resnet: 訓練時每一个层都有一个“生存概率”，并且都会被任意丢弃，測試時則每個層都用上
+	
+	為什麼要增加 noise 給學生：
+		假設現在是同一個模型同時作為教師與學生，由於 pseudo label 是教師產生的，合理的結果是學生在 unlabeled data with pseudo label 上的 cross entropy 將為零
+		導致學生模型不再學習新東西
+		增加 noise 可以確保 student 的任務更難完成，而不僅僅是學習 teacher model 的知識 => 更 generalize
+
+4. can be called knowledge expansion
+5. at inference time(when teacher generates pseudo labels), the teacher model behaves like an ensemble (no dropout),
+	whereas the student behave like one of the single model in the ensemble model with noise, and
+	it should reach the same performances as teacher (ensemble) model
+
+	so the student model is forced to mimic a more powerfule ensemble model.
+6. other tricks
+	data filtering
+		filter the images that the teacher model has low confidences (out-of-domain images)
+	data balancing
+		to ensure that distribution of unlabeled data match that of the training set
+		all classes have a similar number of labeled images
+
+		duplicate images in classes where there are not enough images
+		take the images with the highest confidence in classes where there are too many images
+7. work well for both hard and soft psuedo labels, and soft psudo labels work slightly better for out-of-domain unlabeled data
+
+流程
+1. train and EfficientNet model on labeled images
+2. generate pseudo labels for 300M unlabeled images
+3. train a larger EfficientNet as a student mdoel on the combination of labeled and pseudo labeled images
+	during the learning of the student, we inject noise such as dropout, stochastic depth,
+		and data augmentation via RandAugment to the student so
+		that the student generalizes better than the teacher
+4. We iterate this process by putting back the student as the teacher.
