@@ -10,7 +10,6 @@ https://colab.research.google.com/drive/1yNLT6kJxTY5LNwaVebQGtFv1MElg8jaf#scroll
     4. [Experiment](#ex1)
     5. [TODO](#todo1)
 
-# NoisyLabel
 # <a name="nls">Noisy Label Skills & Papers
 ## <a name="di">Dataset info
 ## <a name="ta2">Target
