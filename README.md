@@ -17,9 +17,13 @@ https://colab.research.google.com/drive/1yNLT6kJxTY5LNwaVebQGtFv1MElg8jaf#scroll
 ## <a name="ta">Target
 * Find an approach effective at finding out errors.
 * Find an framework that can build robust models having better performance without manually adjusting the labels.
- 
+* Training on hard samples.
+    
 ## <a name="p">Papers
 * see paper_note.txt
     
 ## <a name="ex">Experiment
+* Use softmax confidence score to find out error: can find around 70% errors.
+    
 ## <a name="todo">TODO
+* Implementation of approaches of other papers
