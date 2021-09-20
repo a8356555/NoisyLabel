@@ -23,7 +23,12 @@ https://colab.research.google.com/drive/1yNLT6kJxTY5LNwaVebQGtFv1MElg8jaf#scroll
 * see paper_note.txt
     
 ## <a name="ex">Experiment
+* Use easy binary classification model to detect blank pictures.
+* Use Confusion Matrix to find hard samples and data with noisy labels.
 * Use softmax confidence score to find out error: can find around 70% errors.
+* Use Noisy-Student to further improve the model robustness.
+* 1-stage 懶人法: ^w_t = a*w_{t-1} + (1-a)*w_{t} 
+* (Loss Function)
     
 ## <a name="todo">TODO
 * Implementation of approaches of other papers
